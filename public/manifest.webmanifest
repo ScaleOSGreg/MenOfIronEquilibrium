@@ -1,0 +1,13 @@
+{
+  "name": "Mile Marker — Equilibrium Retreat",
+  "short_name": "Mile Marker",
+  "description": "5F Game Plan for the men of Equilibrium Retreat.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F5F4",
+  "theme_color": "#D50032",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
