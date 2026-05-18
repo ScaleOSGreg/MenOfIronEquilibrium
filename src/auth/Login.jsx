@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
+import { useAuth } from "./AuthContext.jsx";
 
 const C = {
   red: "#D50032", redDk: "#B0002A", ink: "#132229", shell: "#F4F5F4",
@@ -7,11 +9,20 @@ const C = {
 };
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { session } = useAuth();
   const [mode, setMode] = useState("signin"); // signin | reset
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // If already authenticated (either just-signed-in via onAuthStateChange or
+  // navigated here while logged in), bounce to the dashboard. replace: true
+  // keeps /login out of the back-button history.
+  useEffect(() => {
+    if (session) navigate("/", { replace: true });
+  }, [session, navigate]);
 
   async function submit(e) {
     e.preventDefault();
