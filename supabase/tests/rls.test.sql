@@ -8,7 +8,7 @@
 
 begin;
 create extension if not exists pgtap;
-select plan(14);
+select plan(16);
 
 -- ---------- seed ------------------------------------------------------------
 
@@ -109,12 +109,19 @@ select is(
   'mentor cannot see mentee B''s goal (different group)'
 );
 
--- 6. mentor C cannot UPDATE A's goal
-select throws_ok(
+-- 6. mentor C cannot UPDATE A's goal.
+-- Postgres RLS on UPDATE filters rows that fail the USING expression silently
+-- (0 rows affected, no exception). Mirror the lives_ok + is pattern used in
+-- test 3-4 for mentee A's hijack attempt: run the UPDATE, then verify the row
+-- was not modified.
+select lives_ok(
   $$ update goals set title = 'mentor wrote this' where owner_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
-  null,
-  null,
-  'mentor cannot write to mentee A''s goal'
+  'mentor''s UPDATE on mentee A''s goal runs without error (0 rows affected under RLS)'
+);
+select is(
+  (select title from goals where owner_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  'A: read Paul',
+  'mentor cannot write to mentee A''s goal — title unchanged'
 );
 
 -- 7. mentor C can read A's marks
@@ -141,12 +148,16 @@ select is(
   'admin sees all goals across groups'
 );
 
--- 10. admin cannot UPDATE someone else's goal (write is still owner-only)
-select throws_ok(
+-- 10. admin cannot UPDATE someone else's goal (write is still owner-only).
+-- Same RLS-silent-filter semantics as test 9.
+select lives_ok(
   $$ update goals set title = 'admin overwrite' where owner_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
-  null,
-  null,
-  'admin can read all but cannot write to another man''s goal'
+  'admin''s UPDATE on another man''s goal runs without error (0 rows affected under RLS)'
+);
+select is(
+  (select title from goals where owner_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  'A: read Paul',
+  'admin can read all but cannot write to another man''s goal — title unchanged'
 );
 
 -- 11. anonymous (no JWT) sees nothing
