@@ -13,17 +13,19 @@ export default function AuthCallback() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
+    // Supabase's createClient with detectSessionInUrl: true strips the URL
+    // hash before this effect runs, so reading `window.location.hash` to find
+    // type=invite|recovery is racy and usually empty. Instead: the only ways
+    // to legitimately land on /auth/callback are invite-accept and
+    // password-reset, both of which need the user to set a password. So if
+    // we have a session here, always prompt. (A "skip" link could be added
+    // later if a non-password-needing flow is introduced.)
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
         setMsg("Link expired. Ask your mentor to resend the invite.");
         return;
       }
-      // If user metadata says they were invited (no password yet),
-      // prompt for one. Otherwise drop them at the dashboard.
-      const hash = new URLSearchParams(window.location.hash.slice(1));
-      const type = hash.get("type");
-      if (type === "invite" || type === "recovery") setNeedsPassword(true);
-      else nav("/", { replace: true });
+      setNeedsPassword(true);
     });
   }, [nav]);
 
