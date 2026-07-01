@@ -526,6 +526,8 @@ function CoachPanel({ goal, onClose }) {
 /*  GOAL MODAL                                                         */
 /* ------------------------------------------------------------------ */
 
+const NUDGE_STORAGE_KEY = "milemarker.coach_nudge_dismissed";
+
 function GoalModal({ fKey, existing, onSave, onClose }) {
   const [f, setF] = useState(existing?.f ?? fKey ?? "faith");
   const [title, setTitle] = useState(existing?.title ?? "");
@@ -534,6 +536,20 @@ function GoalModal({ fKey, existing, onSave, onClose }) {
     r: existing?.smart?.r ?? "", t: existing?.smart?.t ?? "",
   });
   const [coachOpen, setCoachOpen] = useState(false);
+  const [nudgeVisible, setNudgeVisible] = useState(() => {
+    try { return !localStorage.getItem(NUDGE_STORAGE_KEY); }
+    catch { return true; }
+  });
+
+  const dismissNudge = () => {
+    setNudgeVisible(false);
+    try { localStorage.setItem(NUDGE_STORAGE_KEY, "1"); } catch { /* private mode */ }
+  };
+  const openCoachViaNudge = () => {
+    dismissNudge();
+    setCoachOpen(true);
+  };
+
   const rows = [
     ["s", "Specific", "What exactly will be accomplished?"],
     ["m", "Measurable", "How will you know it's done?"],
@@ -543,6 +559,7 @@ function GoalModal({ fKey, existing, onSave, onClose }) {
   ];
   return (
     <div onClick={onClose} style={overlay}>
+      <style>{`@keyframes coach-nudge-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div onClick={(e) => e.stopPropagation()} style={{ ...sheet, maxWidth: 560 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ ...display, fontSize: 22, margin: 0, color: C.text }}>
@@ -584,20 +601,57 @@ function GoalModal({ fKey, existing, onSave, onClose }) {
         {coachOpen ? (
           <CoachPanel goal={{ f, title, smart: sm }} onClose={() => setCoachOpen(false)} />
         ) : (
-          <button type="button" onClick={() => setCoachOpen(true)}
-            disabled={!title.trim()}
-            style={{
-              marginTop: 18, width: "100%", padding: "11px 14px", borderRadius: 9,
-              border: `1px dashed ${title.trim() ? C.red : C.line}`,
-              background: title.trim() ? "rgba(213,0,50,0.04)" : "transparent",
-              color: title.trim() ? C.redDk : C.faint,
-              cursor: title.trim() ? "pointer" : "default",
-              fontSize: 13, fontWeight: 700, letterSpacing: ".02em",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}>
-            <Sparkles size={14} />
-            {title.trim() ? "Get Coach Feedback" : "Add a headline first to unlock the Coach"}
-          </button>
+          <>
+            {nudgeVisible && title.trim() && (
+              <div style={{
+                marginTop: 18, padding: "12px 14px", borderRadius: 12,
+                background: "linear-gradient(135deg, rgba(213,0,50,0.07), rgba(213,0,50,0.02))",
+                border: "1px solid rgba(213,0,50,0.22)",
+                display: "flex", alignItems: "center", gap: 10,
+                animation: "coach-nudge-in 260ms ease-out",
+              }}>
+                <div style={{
+                  flexShrink: 0, width: 32, height: 32, borderRadius: 8,
+                  background: "#fff", border: `1px solid rgba(213,0,50,0.20)`,
+                  display: "grid", placeItems: "center",
+                }}>
+                  <Sparkles size={16} color={C.red} />
+                </div>
+                <div style={{ flex: 1, fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+                  <strong>Not sure this hits SMART?</strong>{" "}
+                  <span style={{ color: C.sub }}>Coach can check it in a few seconds.</span>
+                </div>
+                <button type="button" onClick={openCoachViaNudge} style={{
+                  padding: "7px 12px", borderRadius: 7, border: "none", background: C.red,
+                  color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: ".02em",
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}>
+                  Ask Coach
+                </button>
+                <button type="button" onClick={dismissNudge} title="Dismiss" style={{
+                  padding: 4, border: "none", background: "transparent", cursor: "pointer",
+                  color: C.faint, display: "grid", placeItems: "center",
+                }}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <button type="button" onClick={() => setCoachOpen(true)}
+              disabled={!title.trim()}
+              style={{
+                marginTop: nudgeVisible && title.trim() ? 10 : 18,
+                width: "100%", padding: "11px 14px", borderRadius: 9,
+                border: `1px dashed ${title.trim() ? C.red : C.line}`,
+                background: title.trim() ? "rgba(213,0,50,0.04)" : "transparent",
+                color: title.trim() ? C.redDk : C.faint,
+                cursor: title.trim() ? "pointer" : "default",
+                fontSize: 13, fontWeight: 700, letterSpacing: ".02em",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}>
+              <Sparkles size={14} />
+              {title.trim() ? "Get Coach Feedback" : "Add a headline first to unlock the Coach"}
+            </button>
+          </>
         )}
 
         <button onClick={() => { if (title.trim()) onSave({ f, title: title.trim(), smart: sm }); }}
