@@ -208,6 +208,16 @@ export async function setProfileSuspended(targetId, isSuspended) {
   if (error) throw error;
 }
 
+/* ---------- coach (Edge Function) ---------------------------------------- */
+
+export async function askCoach({ goal, messages, videos }) {
+  const { data, error } = await supabase.functions.invoke("goal-coach", {
+    body: { goal, messages, videos },
+  });
+  if (error) throw error;
+  return data;
+}
+
 /* ---------- invite (Edge Function) --------------------------------------- */
 
 export async function inviteMan({ email, full_name, group_id, role = "mentee" }) {

@@ -3,14 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Plus, Target, TrendingUp, Users, ArrowLeft, Flag,
   AlertTriangle, Edit3, X, Save, BookOpen, Compass, Shield, Camera, LogOut, UserPlus,
-  MoreVertical, UserMinus, UserCheck,
+  MoreVertical, UserMinus, UserCheck, Sparkles, Send,
 } from "lucide-react";
 import { useAuth, signOut } from "./auth/AuthContext.jsx";
 import {
   loadState, upsertGoal, deleteGoal as deleteGoalRow, upsertMark,
   addPhoto as addPhotoRow, deletePhoto as deletePhotoRow, updateProfile, inviteMan,
-  setProfileSuspended,
+  setProfileSuspended, askCoach,
 } from "./lib/storage.js";
+import coachVideos from "./lib/coach-videos.json";
 
 /* ------------------------------------------------------------------ */
 /*  BRAND — Men of Iron Brand Standards Rev 08.2016                    */
@@ -324,6 +325,204 @@ function Field({ label, value, set, ph }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  COACH PANEL — Anthropic-backed SMART goal coach                    */
+/* ------------------------------------------------------------------ */
+
+// Tiny markdown renderer — supports **bold**, [text](url), and `- ` bullets.
+// Deliberately narrow scope; a full lib would be overkill for the coach's
+// response shape and would balloon the bundle.
+function renderCoachText(text) {
+  if (!text) return null;
+  const blocks = text.split(/\n\n+/);
+  return blocks.map((block, bi) => {
+    const lines = block.split("\n");
+    const isBulletBlock = lines.every((l) => /^\s*[-*]\s+/.test(l));
+    if (isBulletBlock) {
+      return (
+        <ul key={bi} style={{ margin: "0 0 10px 0", paddingLeft: 20 }}>
+          {lines.map((l, li) => (
+            <li key={li} style={{ marginBottom: 4, lineHeight: 1.5 }}>
+              {renderInline(l.replace(/^\s*[-*]\s+/, ""))}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p key={bi} style={{ margin: "0 0 10px 0", lineHeight: 1.55 }}>
+        {lines.map((l, li) => (
+          <React.Fragment key={li}>
+            {li > 0 && <br />}
+            {renderInline(l)}
+          </React.Fragment>
+        ))}
+      </p>
+    );
+  });
+}
+
+function renderInline(text) {
+  const parts = [];
+  // First split on markdown links [text](url). Everything else runs through bold pass.
+  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let last = 0;
+  let m;
+  while ((m = linkRe.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: "text", value: text.slice(last, m.index) });
+    parts.push({ type: "link", label: m[1], href: m[2] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
+
+  return parts.map((part, i) => {
+    if (part.type === "link") {
+      return (
+        <a key={i} href={part.href} target="_blank" rel="noopener noreferrer"
+          style={{ color: "#D50032", textDecoration: "underline" }}>{part.label}</a>
+      );
+    }
+    // Bold pass on plain text parts.
+    const boldRe = /\*\*([^*]+)\*\*/g;
+    const chunks = [];
+    let lastB = 0;
+    let bm;
+    while ((bm = boldRe.exec(part.value)) !== null) {
+      if (bm.index > lastB) chunks.push(part.value.slice(lastB, bm.index));
+      chunks.push(<strong key={`b${i}-${bm.index}`}>{bm[1]}</strong>);
+      lastB = bm.index + bm[0].length;
+    }
+    if (lastB < part.value.length) chunks.push(part.value.slice(lastB));
+    return <React.Fragment key={i}>{chunks}</React.Fragment>;
+  });
+}
+
+function CoachPanel({ goal, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const scrollRef = useRef(null);
+  const startedRef = useRef(false);
+
+  const send = useCallback(async (text) => {
+    if (!text || busy) return;
+    setError("");
+    setBusy(true);
+    const outgoing = [...messages, { role: "user", content: text }];
+    setMessages(outgoing);
+    setInput("");
+    try {
+      const { reply } = await askCoach({
+        goal,
+        messages: outgoing,
+        videos: coachVideos.videos,
+      });
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch (e) {
+      setError(e?.message || "Coach unreachable. Save your goal and try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, goal, messages]);
+
+  // Auto-send the opening prompt exactly once when the panel opens.
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    send("Give me a SMART critique of my draft. Be brief. Suggest a rewrite only if it needs one.");
+  }, [send]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
+
+  function submit(e) {
+    e.preventDefault();
+    send(input.trim());
+  }
+
+  return (
+    <div style={{
+      marginTop: 18, border: `1px solid ${C.line}`, borderRadius: 12,
+      background: "#FBFBFB", overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 14px", borderBottom: `1px solid ${C.line}`, background: "#fff",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Sparkles size={15} color={C.red} />
+          <span style={{ fontWeight: 700, fontSize: 13, color: C.text, letterSpacing: ".02em" }}>
+            Coach
+          </span>
+          <span style={{ fontSize: 11, color: C.faint }}>· Haiku</span>
+        </div>
+        <button type="button" onClick={onClose} style={iconBtn} title="Hide coach">
+          <X size={15} />
+        </button>
+      </div>
+
+      <div ref={scrollRef} style={{
+        maxHeight: 260, overflowY: "auto", padding: 14, fontSize: 13.5, color: C.text,
+      }}>
+        {messages.filter((m, i) => !(i === 0 && m.role === "user")).map((m, i) => (
+          <div key={i} style={{
+            display: "flex",
+            justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+            marginBottom: 10,
+          }}>
+            <div style={{
+              maxWidth: "88%",
+              padding: "9px 12px",
+              borderRadius: 10,
+              background: m.role === "user" ? C.redSoft : "#fff",
+              border: `1px solid ${m.role === "user" ? "rgba(213,0,50,0.15)" : C.line}`,
+              color: C.text,
+            }}>
+              {renderCoachText(m.content)}
+            </div>
+          </div>
+        ))}
+        {busy && (
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div style={{
+              padding: "8px 12px", borderRadius: 10, background: "#fff",
+              border: `1px solid ${C.line}`, color: C.sub, fontSize: 12.5, fontStyle: "italic",
+            }}>
+              Coach is thinking…
+            </div>
+          </div>
+        )}
+        {error && (
+          <div style={{ marginTop: 8, fontSize: 12, color: C.redDk }}>{error}</div>
+        )}
+      </div>
+
+      <form onSubmit={submit} style={{
+        display: "flex", gap: 8, padding: 10, borderTop: `1px solid ${C.line}`, background: "#fff",
+      }}>
+        <input value={input} onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask the coach…"
+          disabled={busy}
+          style={{
+            flex: 1, padding: "9px 12px", borderRadius: 8, fontSize: 13,
+            border: `1px solid ${C.line}`, background: "#FBFBFB",
+            color: C.text, outline: "none", boxSizing: "border-box",
+          }} />
+        <button type="submit" disabled={busy || !input.trim()} style={{
+          padding: "0 14px", borderRadius: 8, border: "none",
+          background: busy || !input.trim() ? C.line : C.red,
+          color: "#fff", cursor: busy || !input.trim() ? "default" : "pointer",
+          display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600,
+        }}>
+          <Send size={13} />
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  GOAL MODAL                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -334,6 +533,7 @@ function GoalModal({ fKey, existing, onSave, onClose }) {
     s: existing?.smart?.s ?? "", m: existing?.smart?.m ?? "", a: existing?.smart?.a ?? "",
     r: existing?.smart?.r ?? "", t: existing?.smart?.t ?? "",
   });
+  const [coachOpen, setCoachOpen] = useState(false);
   const rows = [
     ["s", "Specific", "What exactly will be accomplished?"],
     ["m", "Measurable", "How will you know it's done?"],
@@ -381,8 +581,27 @@ function GoalModal({ fKey, existing, onSave, onClose }) {
           ))}
         </div>
 
+        {coachOpen ? (
+          <CoachPanel goal={{ f, title, smart: sm }} onClose={() => setCoachOpen(false)} />
+        ) : (
+          <button type="button" onClick={() => setCoachOpen(true)}
+            disabled={!title.trim()}
+            style={{
+              marginTop: 18, width: "100%", padding: "11px 14px", borderRadius: 9,
+              border: `1px dashed ${title.trim() ? C.red : C.line}`,
+              background: title.trim() ? "rgba(213,0,50,0.04)" : "transparent",
+              color: title.trim() ? C.redDk : C.faint,
+              cursor: title.trim() ? "pointer" : "default",
+              fontSize: 13, fontWeight: 700, letterSpacing: ".02em",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+            <Sparkles size={14} />
+            {title.trim() ? "Get Coach Feedback" : "Add a headline first to unlock the Coach"}
+          </button>
+        )}
+
         <button onClick={() => { if (title.trim()) onSave({ f, title: title.trim(), smart: sm }); }}
-          style={{ ...primaryBtn, width: "100%", marginTop: 24 }}>
+          style={{ ...primaryBtn, width: "100%", marginTop: 14 }}>
           <Save size={16} /> {existing ? "Save changes" : "Add goal"}
         </button>
       </div>

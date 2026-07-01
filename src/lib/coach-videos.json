@@ -1,0 +1,70 @@
+{
+  "_description": "Curated video suggestions the Coach can recommend to men refining their SMART goals. Each entry uses a YouTube SEARCH URL rather than a specific video URL so that link-rot doesn't produce dead links. Edit freely to reflect the videos you want the brotherhood watching. The Coach picks 0-2 per response based on which best fit the goal being discussed.",
+
+  "videos": [
+    {
+      "id": "smart-framework-intro",
+      "title": "SMART goals framework — the basics",
+      "channel": "General search",
+      "why": "Best starter clip for a man who has never framed a goal SMART before. Covers what each letter means with concrete examples.",
+      "topics": ["general", "beginner", "framework"],
+      "searchUrl": "https://www.youtube.com/results?search_query=SMART+goals+framework+explained"
+    },
+    {
+      "id": "hyatt-best-year-ever",
+      "title": "Michael Hyatt — Best Year Ever / SMARTER goals",
+      "channel": "Michael Hyatt",
+      "why": "Extends SMART to SMARTER (Exciting, Risky) — great for men whose goals feel safe or uninspiring.",
+      "topics": ["motivation", "yearly", "advanced"],
+      "searchUrl": "https://www.youtube.com/results?search_query=Michael+Hyatt+SMARTER+goals"
+    },
+    {
+      "id": "clear-atomic-habits",
+      "title": "James Clear — Atomic Habits and goal-vs-system thinking",
+      "channel": "James Clear",
+      "why": "For men whose goals lack a repeatable daily rhythm — reframes goals into habits.",
+      "topics": ["habits", "measurable", "achievable"],
+      "searchUrl": "https://www.youtube.com/results?search_query=James+Clear+Atomic+Habits+goals+vs+systems"
+    },
+    {
+      "id": "groeschel-leadership-goals",
+      "title": "Craig Groeschel Leadership Podcast — goal setting",
+      "channel": "Life.Church",
+      "why": "Christian leadership frame on setting goals that matter — good for the Faith F.",
+      "topics": ["faith", "leadership", "relevant"],
+      "searchUrl": "https://www.youtube.com/results?search_query=Craig+Groeschel+leadership+podcast+goals"
+    },
+    {
+      "id": "ramsey-financial-goals",
+      "title": "Dave Ramsey — setting financial goals",
+      "channel": "The Ramsey Show",
+      "why": "Concrete, biblically-anchored money goals — for the Finances F when a man writes something vague like 'save more'.",
+      "topics": ["finances", "measurable", "time-bound"],
+      "searchUrl": "https://www.youtube.com/results?search_query=Dave+Ramsey+setting+financial+goals"
+    },
+    {
+      "id": "sinek-start-with-why",
+      "title": "Simon Sinek — Start With Why",
+      "channel": "Simon Sinek",
+      "why": "For a goal that feels flat — helps a man articulate WHY he's chasing it, which strengthens the Relevant leg of SMART.",
+      "topics": ["relevant", "motivation", "purpose"],
+      "searchUrl": "https://www.youtube.com/results?search_query=Simon+Sinek+start+with+why+goals"
+    },
+    {
+      "id": "maxwell-goals-vs-growth",
+      "title": "John Maxwell — goals vs growth",
+      "channel": "John Maxwell",
+      "why": "For a man setting arrival goals (e.g. 'lose 20 lbs') instead of growth goals — helpful reframe.",
+      "topics": ["growth", "achievable", "long-term"],
+      "searchUrl": "https://www.youtube.com/results?search_query=John+Maxwell+goals+vs+growth+plan"
+    },
+    {
+      "id": "man-in-the-mirror-goals",
+      "title": "Man in the Mirror — biblical goal setting for men",
+      "channel": "Man in the Mirror ministry",
+      "why": "Christian men's ministry frame — directly speaks to the 5F rhythm we use.",
+      "topics": ["faith", "family", "biblical"],
+      "searchUrl": "https://www.youtube.com/results?search_query=Man+in+the+Mirror+goal+setting+Christian+men"
+    }
+  ]
+}
