@@ -16,9 +16,15 @@ const BUCKET = "goal-photos";
 
 /* ---------- read ---------------------------------------------------------- */
 
-export async function loadState(currentUserId) {
+export async function loadState(currentUserId, role) {
+  // Admins need to see suspended profiles to be able to unsuspend them; for
+  // every other role we keep the application-level deleted_at filter as
+  // defense-in-depth (the RLS policies do not filter deleted_at themselves).
+  const profilesQuery = supabase.from("profiles").select("*");
+  if (role !== "admin") profilesQuery.is("deleted_at", null);
+
   const [profilesRes, goalsRes, marksRes, photosRes] = await Promise.all([
-    supabase.from("profiles").select("*").is("deleted_at", null),
+    profilesQuery,
     supabase.from("goals").select("*").is("deleted_at", null),
     supabase.from("mile_markers").select("*"),
     supabase.from("goal_photos").select("*"),
@@ -37,6 +43,7 @@ export async function loadState(currentUserId) {
       retreat: "Equilibrium Retreat",
       photo: p.photo_url ?? "",
       group_id: p.group_id,
+      is_suspended: !!p.deleted_at,
     };
   }
 
@@ -189,6 +196,16 @@ export async function deletePhoto(photoId, storagePath) {
   const del = await supabase.from("goal_photos").delete().eq("id", photoId);
   if (del.error) throw del.error;
   if (storagePath) await supabase.storage.from(BUCKET).remove([storagePath]);
+}
+
+/* ---------- admin: suspend / unsuspend ----------------------------------- */
+
+export async function setProfileSuspended(targetId, isSuspended) {
+  const { error } = await supabase.rpc("admin_set_profile_deleted", {
+    target_id: targetId,
+    is_deleted: isSuspended,
+  });
+  if (error) throw error;
 }
 
 /* ---------- invite (Edge Function) --------------------------------------- */

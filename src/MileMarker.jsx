@@ -3,11 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Plus, Target, TrendingUp, Users, ArrowLeft, Flag,
   AlertTriangle, Edit3, X, Save, BookOpen, Compass, Shield, Camera, LogOut, UserPlus,
+  MoreVertical, UserMinus, UserCheck,
 } from "lucide-react";
 import { useAuth, signOut } from "./auth/AuthContext.jsx";
 import {
   loadState, upsertGoal, deleteGoal as deleteGoalRow, upsertMark,
   addPhoto as addPhotoRow, deletePhoto as deletePhotoRow, updateProfile, inviteMan,
+  setProfileSuspended,
 } from "./lib/storage.js";
 
 /* ------------------------------------------------------------------ */
@@ -897,13 +899,15 @@ function Dashboard({ st, setSt, personId, readOnly, onBack, onEditProfile }) {
 /*  TEAM DASHBOARD — roster grid                                       */
 /* ------------------------------------------------------------------ */
 
-function TeamDashboard({ st, selfId, onOpen }) {
+function TeamDashboard({ st, selfId, role, onOpen, onToggleSuspend }) {
   // Show everyone the viewer is allowed to see, but float self to the top.
+  // For admins, separate active vs suspended (only admins can see suspended).
   const all = Object.values(st.people);
-  const people = [
-    ...all.filter((p) => p.id === selfId),
-    ...all.filter((p) => p.id !== selfId),
+  const active = [
+    ...all.filter((p) => p.id === selfId && !p.is_suspended),
+    ...all.filter((p) => p.id !== selfId && !p.is_suspended),
   ];
+  const suspended = all.filter((p) => p.is_suspended);
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px 80px" }}>
@@ -917,40 +921,119 @@ function TeamDashboard({ st, selfId, onOpen }) {
         </p>
       </div>
 
-      {/* roster */}
+      {/* active roster */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 16 }}>
-        {people.map((p) => {
-          const o = overall(st, p.id);
-          const gc = personGoals(st, p.id).length;
-          const wr = worstRag(st, p.id);
-          return (
-            <button key={p.id} onClick={() => onOpen(p.id)} style={{
-              textAlign: "left", cursor: "pointer", padding: "20px", borderRadius: 16,
-              border: `1px solid ${C.line}`, background: C.panel, boxShadow: "0 1px 2px rgba(19,34,41,0.04)",
-              transition: "transform 160ms, box-shadow 160ms, border-color 160ms" }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 10px 26px rgba(19,34,41,0.10)"; e.currentTarget.style.borderColor = C.redLine; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 1px 2px rgba(19,34,41,0.04)"; e.currentTarget.style.borderColor = C.line; }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Avatar person={p} size={52} />
-                <div style={{ position: "relative" }}>
-                  <Ring value={o} size={52} stroke={5} />
-                  <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
-                    ...display, fontSize: 13, color: C.text }}>{o}%</span>
-                </div>
-              </div>
-              <div style={{ ...display, fontSize: 20, marginTop: 14, color: C.text }}>{p.name}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                {wr ? <RagPill rag={wr} /> : <span style={{ fontSize: 11.5, color: C.faint }}>No marks yet</span>}
-              </div>
-              <div style={{ fontSize: 12.5, color: C.sub, marginTop: 12, display: "flex", alignItems: "center", gap: 6,
-                borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
-                <Target size={13} /> {gc} goal{gc !== 1 ? "s" : ""} tracked
-                <ChevronRight size={14} style={{ marginLeft: "auto" }} />
-              </div>
-            </button>
-          );
-        })}
+        {active.map((p) => (
+          <TeamCard key={p.id} p={p} st={st} selfId={selfId} role={role}
+            onOpen={onOpen} onToggleSuspend={onToggleSuspend} />
+        ))}
       </div>
+
+      {role === "admin" && suspended.length > 0 && (
+        <div style={{ marginTop: 40 }}>
+          <div style={{ ...kicker, color: C.sub, marginBottom: 12 }}>
+            Suspended ({suspended.length})
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 16 }}>
+            {suspended.map((p) => (
+              <TeamCard key={p.id} p={p} st={st} selfId={selfId} role={role}
+                onOpen={onOpen} onToggleSuspend={onToggleSuspend} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamCard({ p, st, selfId, role, onOpen, onToggleSuspend }) {
+  const o = overall(st, p.id);
+  const gc = personGoals(st, p.id).length;
+  const wr = worstRag(st, p.id);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const canManage = role === "admin" && p.id !== selfId;
+  const isSuspended = !!p.is_suspended;
+
+  async function handleToggle(e) {
+    e.stopPropagation();
+    setMenuOpen(false);
+    const verb = isSuspended ? "unsuspend" : "suspend";
+    if (!window.confirm(`Are you sure you want to ${verb} ${p.name}?`)) return;
+    setBusy(true);
+    try {
+      await onToggleSuspend(p.id, !isSuspended);
+    } catch (err) {
+      alert(err?.message || `Failed to ${verb}.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => onOpen(p.id)} style={{
+        textAlign: "left", cursor: "pointer", padding: "20px", borderRadius: 16, width: "100%",
+        border: `1px solid ${C.line}`, background: C.panel, boxShadow: "0 1px 2px rgba(19,34,41,0.04)",
+        transition: "transform 160ms, box-shadow 160ms, border-color 160ms",
+        opacity: isSuspended ? 0.55 : 1 }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 10px 26px rgba(19,34,41,0.10)"; e.currentTarget.style.borderColor = C.redLine; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 1px 2px rgba(19,34,41,0.04)"; e.currentTarget.style.borderColor = C.line; }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Avatar person={p} size={52} />
+          <div style={{ position: "relative" }}>
+            <Ring value={o} size={52} stroke={5} />
+            <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
+              ...display, fontSize: 13, color: C.text }}>{o}%</span>
+          </div>
+        </div>
+        <div style={{ ...display, fontSize: 20, marginTop: 14, color: C.text }}>{p.name}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          {isSuspended ? (
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em",
+              padding: "3px 8px", borderRadius: 4, background: "#E9ECEE", color: C.sub }}>
+              SUSPENDED
+            </span>
+          ) : wr ? <RagPill rag={wr} /> : <span style={{ fontSize: 11.5, color: C.faint }}>No marks yet</span>}
+        </div>
+        <div style={{ fontSize: 12.5, color: C.sub, marginTop: 12, display: "flex", alignItems: "center", gap: 6,
+          borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+          <Target size={13} /> {gc} goal{gc !== 1 ? "s" : ""} tracked
+          <ChevronRight size={14} style={{ marginLeft: "auto" }} />
+        </div>
+      </button>
+
+      {canManage && (
+        <>
+          <button onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+            disabled={busy}
+            aria-label={`Manage ${p.name}`}
+            style={{
+              position: "absolute", top: 12, right: 12, width: 28, height: 28,
+              border: "none", borderRadius: 6, background: "rgba(255,255,255,0.85)",
+              cursor: busy ? "default" : "pointer", display: "grid", placeItems: "center",
+              boxShadow: "0 1px 4px rgba(19,34,41,0.10)" }}>
+            <MoreVertical size={15} color={C.sub} />
+          </button>
+          {menuOpen && (
+            <div onClick={(e) => e.stopPropagation()}
+              style={{ position: "absolute", top: 44, right: 12, minWidth: 160,
+                background: "#fff", border: `1px solid ${C.line}`, borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(19,34,41,0.14)", padding: 4, zIndex: 5 }}>
+              <button onClick={handleToggle} disabled={busy} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "9px 12px", border: "none", background: "transparent",
+                cursor: busy ? "default" : "pointer", fontSize: 13, color: C.text,
+                textAlign: "left", borderRadius: 6 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#F4F5F4"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                {isSuspended ? <UserCheck size={14} /> : <UserMinus size={14} />}
+                {isSuspended ? "Unsuspend" : "Suspend"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -980,11 +1063,11 @@ export default function App({ initialView }) {
   useEffect(() => {
     if (!SELF) return;
     let cancelled = false;
-    loadState(SELF)
+    loadState(SELF, role)
       .then((s) => { if (!cancelled) setStRaw(s); })
       .catch((e) => { if (!cancelled) setLoadErr(e.message || "Failed to load."); });
     return () => { cancelled = true; };
-  }, [SELF]);
+  }, [SELF, role]);
 
   const setSt = useCallback((u) => {
     setStRaw((prev) => (typeof u === "function" ? u(prev) : u));
@@ -1073,7 +1156,16 @@ export default function App({ initialView }) {
             onEditProfile={() => setEditingProfile(true)} />
         )}
         {view === "team" && !target && (
-          <TeamDashboard st={st} selfId={SELF} onOpen={(id) => nav(`/team/${id}`)} />
+          <TeamDashboard st={st} selfId={SELF} role={role}
+            onOpen={(id) => nav(`/team/${id}`)}
+            onToggleSuspend={async (id, isSuspended) => {
+              await setProfileSuspended(id, isSuspended);
+              setSt((prev) => {
+                const n = structuredClone(prev);
+                if (n.people[id]) n.people[id].is_suspended = isSuspended;
+                return n;
+              });
+            }} />
         )}
         {view === "team" && target && (
           <Dashboard st={st} setSt={setSt} personId={target}

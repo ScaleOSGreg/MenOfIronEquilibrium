@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("id, full_name, role, group_id, photo_url")
+      .select("id, full_name, role, group_id, photo_url, deleted_at")
       .eq("id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {
