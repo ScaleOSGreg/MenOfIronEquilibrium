@@ -429,7 +429,7 @@ function CoachPanel({ goal, onClose }) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    send("Give me a SMART critique of my draft. Be brief. Suggest a rewrite only if it needs one.");
+    send("Here's what I'm working on. Take a look and tell me where you see me.");
   }, [send]);
 
   useEffect(() => {
