@@ -381,15 +381,24 @@ function renderInline(text) {
           style={{ color: "#D50032", textDecoration: "underline" }}>{part.label}</a>
       );
     }
-    // Bold pass on plain text parts.
-    const boldRe = /\*\*([^*]+)\*\*/g;
+    // Bold + italic pass on plain text parts. The regex tries `**...**` first
+    // (bold) and falls through to `*...*` (italic); JS alternation is left-to-
+    // right, so bold consumes its markers before italic can grab them.
+    const inlineRe = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
     const chunks = [];
     let lastB = 0;
     let bm;
-    while ((bm = boldRe.exec(part.value)) !== null) {
+    let n = 0;
+    while ((bm = inlineRe.exec(part.value)) !== null) {
       if (bm.index > lastB) chunks.push(part.value.slice(lastB, bm.index));
-      chunks.push(<strong key={`b${i}-${bm.index}`}>{bm[1]}</strong>);
-      lastB = bm.index + bm[0].length;
+      const tok = bm[0];
+      if (tok.startsWith("**")) {
+        chunks.push(<strong key={`b${i}-${n}`}>{tok.slice(2, -2)}</strong>);
+      } else {
+        chunks.push(<em key={`i${i}-${n}`}>{tok.slice(1, -1)}</em>);
+      }
+      lastB = bm.index + tok.length;
+      n++;
     }
     if (lastB < part.value.length) chunks.push(part.value.slice(lastB));
     return <React.Fragment key={i}>{chunks}</React.Fragment>;
